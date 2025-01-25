@@ -164,27 +164,52 @@
             }
 
             try {
-                const response = await fetch(`${backendUrl}/sessions`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ prompt: value })
-                });
+                // If we already have a session, update it instead of creating new
+                if (sessionId) {
+                    const response = await fetch(`${backendUrl}/sessions/${sessionId}/prompts`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({ prompt: value })
+                    });
 
-                if (!response.ok) throw new Error("Failed to start session.");
-                
-                const data = await response.json();
-                sessionId = data.sessionId;
-                playlist = data.playlist;
-                localStorage.setItem("sessionId", sessionId);
+                    if (!response.ok) throw new Error("Failed to update session.");
+                    
+                    // Fetch the updated session data
+                    const sessionResponse = await fetch(`${backendUrl}/sessions/${sessionId}`);
+                    if (!sessionResponse.ok) throw new Error("Failed to fetch updated session.");
+                    
+                    const data = await sessionResponse.json();
+                    playlist = data.playlist;
+                } else {
+                    // Original create session logic
+                    const response = await fetch(`${backendUrl}/sessions`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({ prompt: value })
+                    });
+
+                    if (!response.ok) throw new Error("Failed to start session.");
+                    
+                    const data = await response.json();
+                    sessionId = data.session_id;
+                    playlist = data.playlist;
+                    localStorage.setItem("sessionId", sessionId);
+                }
                 
                 playPlaylist(playlist);
                 updatePlaylistUI();
                 document.getElementById('playlistContainer').style.display = 'block';
+                promptInput.value = ''; // Clear the input after successful submission
             } catch (error) {
-                console.error("Error starting session: ", error);
-                alert("Failed to start session. Please try again.");
+                console.error("Error with session: ", error);
+                alert("Failed to process request. Please try again.");
+                // Clear the sessionId
+                sessionId = null;
+                localStorage.removeItem("sessionId");
             }
         }
 
@@ -213,7 +238,7 @@
 
         // Initialize
         async function init() {
-            if (sessionId) {
+            if (sessionId && sessionId !== "null" && sessionId !== "undefined") {
                 try {
                     const response = await fetch(`${backendUrl}/sessions/${sessionId}`, {
                         method: "GET"

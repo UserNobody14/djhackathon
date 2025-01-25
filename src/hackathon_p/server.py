@@ -235,23 +235,8 @@ async def add_prompt(session_id: str, prompt_request: PromptRequest):
         (session_id, prompt_request.prompt, next_order),
     )
 
-    # Get old playlist
-    c.execute(
-        "SELECT song_name, artist, duration, energy, bpm, song_url, song_id FROM playlist_items WHERE session_id = ?",
-        (session_id,),
-    )
-    old_playlist = [
-        PlaylistItem(
-            song_name=p[0],
-            artist=p[1],
-            duration=p[2],
-            energy=p[3],
-            bpm=p[4],
-            song_url=p[5],
-            song_id=p[6],
-        )
-        for p in c.fetchall()
-    ]
+    # Delete existing playlist items
+    c.execute("DELETE FROM playlist_items WHERE session_id = ?", (session_id,))
 
     # Get possible songs
     c.execute("SELECT song_id, song_file_type, file_path FROM song_files")
@@ -271,7 +256,7 @@ async def add_prompt(session_id: str, prompt_request: PromptRequest):
     # Generate new playlist
     new_playlist = gen_playlist_from_prompt(
         prompt_request.prompt,
-        old_playlist,
+        [],  # Start fresh with empty playlist
         prompt_request.position,
         possible_songs=possible_songs,
     )
@@ -279,7 +264,10 @@ async def add_prompt(session_id: str, prompt_request: PromptRequest):
     # Save new playlist
     for item in new_playlist:
         c.execute(
-            "INSERT INTO playlist_items (session_id, song_name, artist, duration, energy, bpm, song_url, song_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            """
+            INSERT INTO playlist_items (session_id, song_name, artist, duration, energy, bpm, song_url, song_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
             (
                 session_id,
                 item.song_name,
@@ -295,7 +283,8 @@ async def add_prompt(session_id: str, prompt_request: PromptRequest):
     conn.commit()
     conn.close()
 
-    return {"message": "Prompt added successfully", "order": next_order}
+    # Return full session data
+    return await get_session(session_id)
 
 
 # Get session details
@@ -339,7 +328,7 @@ async def get_session(session_id: str):
 
     # Replace the song_url with the full path to the song file
     for item in playlist:
-        item.song_url = f"/songs/{item.song_id}.wav"
+        item.song_url = f"/songs/{item.song_id}.mp3"
 
     return Session(
         session_id=session_id,
