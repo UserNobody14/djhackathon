@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify AI</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200%;
+            width: 75%;
+        }
+        .form-wrapper {
+            background: #fff;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400%;
+        }
+        .title {
+            font-size: 1.8rem;
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+            color: #4a4e69;
+        }
+        .input-group {
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+        .input-group label {
+            display: block;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+            color: #6c757d;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            font-size: 1rem;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            outline: none;
+            transition: border-color 0.3s ease-in-out;
+        }
+        .input-group input:focus {
+            border-color: #4a4e69;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 1rem;
+        }
+        .submit-button {
+            background-color: #4a4e69;
+            color: #fff;
+            font-size: 1rem;
+            font-weight: bold;
+            padding: 0.5rem 1.5rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .submit-button:hover {
+            background-color: #373a53;
+        }
+        .submit-button:focus {
+            outline: 2px solid #4a4e69;
+            outline-offset: 2px;
+        }
+        .playlist {
+            margin-top: 2rem;
+        }
+        .playlist-title {
+            font-size: 1.5rem;
+            color: #4a4e69;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .song-list {
+            list-style: none;
+            padding: 0;
+        }
+        .song-item {
+            padding: 0.5rem;
+            border-bottom: 1px solid #ddd;
+            font-size: 1rem;
+        }
+        .song-item:last-child {
+            border-bottom: none;
+        }
+        .song-item.playing {
+            background-color: #e9ecef;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="form-wrapper">
+            <h1 class="title">Spotify AI</h1>
+            <div class="input-group">
+                <label for="prompt">Prompt</label>
+                <input type="text" id="prompt">
+            </div>
+            <div class="button-container">
+                <button class="submit-button" id="submitButton">Submit</button>
+            </div>
+            <div id="playlistContainer" style="display: none;">
+                <div class="audio-container">
+                    <audio id="audioPlayer" controls crossorigin="anonymous"></audio>
+                </div>
+                <div class="playlist">
+                    <h2 class="playlist-title">Playlist</h2>
+                    <ul class="song-list" id="songList"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const backendUrl = "http://localhost:8000";
+        let sessionId = localStorage.getItem("sessionId");
+        let playlist = [];
+        let currentSongIndex = 0;
+        let audioElement = document.getElementById('audioPlayer');
+        let playingSongId = null;
+        let playingSongUrl = null;
+
+        // Handle song end event
+        audioElement.addEventListener('ended', () => {
+            if (currentSongIndex < playlist.length - 1) {
+                currentSongIndex++;
+                playingSongId = playlist[currentSongIndex].id;
+                playingSongUrl = playlist[currentSongIndex].song_url;
+                audioElement.src = `${backendUrl}${playingSongUrl}`;
+                audioElement.play();
+                updatePlaylistUI();
+            }
+        });
+
+        // Start session function
+        async function startSession() {
+            const promptInput = document.getElementById('prompt');
+            const value = promptInput.value;
+
+            if (!value) {
+                alert("Please provide a prompt.");
+                return;
+            }
+
+            try {
+                const response = await fetch(`${backendUrl}/sessions`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ prompt: value })
+                });
+
+                if (!response.ok) throw new Error("Failed to start session.");
+                
+                const data = await response.json();
+                sessionId = data.sessionId;
+                playlist = data.playlist;
+                localStorage.setItem("sessionId", sessionId);
+                
+                playPlaylist(playlist);
+                updatePlaylistUI();
+                document.getElementById('playlistContainer').style.display = 'block';
+            } catch (error) {
+                console.error("Error starting session: ", error);
+                alert("Failed to start session. Please try again.");
+            }
+        }
+
+        // Play playlist function
+        function playPlaylist(playlistData) {
+            if (!playlistData || playlistData.length === 0) return;
+            
+            playingSongId = playlistData[currentSongIndex].id;
+            playingSongUrl = playlistData[currentSongIndex].song_url;
+            audioElement.src = `${backendUrl}${playingSongUrl}`;
+            audioElement.play();
+        }
+
+        // Update playlist UI
+        function updatePlaylistUI() {
+            const songList = document.getElementById('songList');
+            songList.innerHTML = '';
+            
+            playlist.forEach((song, index) => {
+                const li = document.createElement('li');
+                li.className = `song-item${index === currentSongIndex ? ' playing' : ''}`;
+                li.textContent = `${song.song_name} - ${song.artist}`;
+                songList.appendChild(li);
+            });
+        }
+
+        // Initialize
+        async function init() {
+            if (sessionId) {
+                try {
+                    const response = await fetch(`${backendUrl}/sessions/${sessionId}`, {
+                        method: "GET"
+                    });
+                    
+                    if (!response.ok) throw new Error("Failed to retrieve session.");
+                    
+                    const data = await response.json();
+                    playlist = data.playlist;
+                    
+                    if (playlist) {
+                        playPlaylist(playlist);
+                        updatePlaylistUI();
+                        document.getElementById('playlistContainer').style.display = 'block';
+                    }
+                } catch (error) {
+                    console.error("Error resuming session:", error);
+                    alert("Failed to resume session.");
+                }
+            }
+        }
+
+        // Add event listener to submit button
+        document.getElementById('submitButton').addEventListener('click', startSession);
+
+        // Initialize the app
+        init();
+    </script>
+</body>
+</html>

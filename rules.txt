@@ -1,0 +1,146 @@
+Beat Matching - Prompt Eg:
+Track A has BPM 125, and Track B has BPM 128. Adjust the tempo of Track B to match Track A while ensuring minimal pitch distortion.
+Suggest beat alignment points for a smooth transition.
+
+Key Matching - Prompt Eg:
+Track A is in Key C Major, and Track B is in Key G Major.
+Suggest whether these keys are compatible or if pitch-shifting is needed for harmonic mixing as per camelot wheel.
+If pitch-shifting is required, indicate how many semitones to adjust.
+
+Crossfade Duration
+Track A has an outro lasting 10 seconds, and Track B has an intro lasting 8 seconds.
+Suggest a crossfade duration and timing to blend them seamlessly.
+
+Energy Matching
+Track A has an energy level of 0.7, and Track B has an energy level of 0.9.
+Suggest a way to transition between the tracks to maintain or enhance the energy flow.
+
+Overall Prompt:
+
+Plan a seamless transition between two tracks:
+- Track A: BPM 125, Key C Major, Energy 0.8, Outro starts at 2:50 and ends at 3:10.
+- Track B: BPM 128, Key G Major, Energy 0.9, Intro starts at 0:00 and lasts 8 seconds.
+
+Transition Details:
+1. Beat alignment:
+   - Adjust BPM of Track B to match 125 BPM.
+   - Align beats starting at 2:55 on Track A and 0:00 on Track B.
+2. Crossfade:
+   - Gradual crossfade lasting 10 seconds from 2:55 on Track A to 0:05 on Track B.
+3. Audio effects:
+   - High-pass filter on Track A starting at 2:55, removing bass frequencies.
+   - Low-pass filter on Track B from 0:00, lifted at 0:05.
+   - Subtle reverb on Track A during fade-out.
+4. Vocal overlaps:
+   - Ensure no vocals overlap during the transition (analyze speechiness or waveforms).
+5. Energy flow:
+   - Reduce Track A's energy from 0.8 to 0.6.
+   - Increase Track B's energy from 0.7 to 0.9.
+
+Add creative descriptions for how this transition enhances the DJ set's mood and ensures a smooth energy flow.
+
+---------
+
+We need to fetch data from Spotify:
+    BPM
+    Key
+    Energy
+    Intro/outro timings
+
+---------
+
+Spotify API:
+GET https://api.spotify.com/v1/audio-features/{id}
+Result: bpm, key, energy, dancebility
+
+GET https://api.spotify.com/v1/audio-analysis/{id}
+Result: sections (intro/outro timings), beats 
+
+GET https://api.spotify.com/v1/tracks/{id}
+Result: name, artist
+
+GET https://api.spotify.com/v1/playlists/{playlist_id}/tracks
+Fetch multiple tracks (Result: id, name, artist)
+
+GET https://api.spotify.com/v1/search?q=SongName
+
+-------
+Algo:
+
+Fetch Data for both tracks. (Above Spotify APIs)
+Calculate Transition Parameter
+
+Input: Playlist , Alteration Request(Prompt) , currentSong
+----
+Choose slave (prompt - select song) as per master
+Calculate transition Paremeters (object)
+----
+Ouput: Modified playlist
+
+{
+
+}
+
+
+---------
+
+type Transition = {
+  trackA: {
+    id: string; // Spotify ID of Track A
+    bpm: number; // Beats Per Minute
+    key: string; // Musical key (e.g., C Major)
+    energy: number; // Energy level (0.0 to 1.0)
+    outro: {
+      start: number; // Timestamp (in seconds) where the outro starts
+      end: number; // Timestamp (in seconds) where the outro ends
+    };
+  };
+  trackB: {
+    id: string; // Spotify ID of Track B
+    bpm: number; // Beats Per Minute
+    key: string; // Musical key (e.g., G Major)
+    energy: number; // Energy level (0.0 to 1.0)
+    intro: {
+      start: number; // Timestamp (in seconds) where the intro starts
+      end: number; // Timestamp (in seconds) where the intro ends
+    };
+  };
+  transition: {
+    bpmAlignment: {
+      originalBPM: {
+        trackA: number;
+        trackB: number;
+      };
+      adjustedBPM: number; // If tempo alignment is applied
+    };
+    keyCompatibility: {
+      compatible: boolean; // Whether the keys are compatible
+      adjustmentRequired: boolean; // If filters or effects are needed
+    };
+    crossfade: {
+      duration: number; // Duration of the crossfade (in seconds)
+      start: number; // Timestamp where the crossfade starts
+      end: number; // Timestamp where the crossfade ends
+    };
+    energyFlow: {
+      fadeOut: number; // Adjusted energy for fade-out
+      fadeIn: number; // Adjusted energy for fade-in
+    };
+    effects: {
+      keyFilterApplied: boolean; // Whether key correction filters are applied
+      reverb: {
+        applied: boolean; // Whether reverb is used
+        settings?: {
+          decay: number; // Reverb decay time
+          mix: number; // Reverb mix percentage
+        };
+      };
+      equalizer: {
+        adjustments: Array<{
+          band: string; // Frequency band (e.g., "bass", "mid", "treble")
+          gain: number; // Gain adjustment in dB
+        }>;
+      };
+    };
+  };
+};
